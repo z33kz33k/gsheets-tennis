@@ -10,17 +10,75 @@
 from datetime import datetime
 import json
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 from unicodedata import normalize
 
-import requests
-
 from rapidapi.sofascore.data import Status
-from utils import Json, get_apikey
+from utils import Json, get_apikey, RequestParamsEndpoint, get_endpoint
 
-HOSTMAP = {'x-rapidapi-host': "sofascore.p.rapidapi.com"}
-KEYMAP = get_apikey("rapidapi", "sofascore")
-HEADERS_MAP = HOSTMAP.update(KEYMAP)
+
+class SofaScoreEndpoint(RequestParamsEndpoint):
+    """SofaScore-specific endpoint.
+    """
+    HOST = "sofascore.p.rapidapi.com"
+    HOSTMAP = {'x-rapidapi-host': HOST}
+    KEYMAP = get_apikey("rapidapi", "sofascore")
+    HEADERS_MAP = {**HOSTMAP, **KEYMAP}
+
+    def __init__(self, endpoint: str, *params: str, optparams: Optional[List[str]] = None,
+                 folder: Optional[str] = None) -> None:
+        super().__init__(endpoint, *params, optparams=optparams, folder=folder)
+
+
+# endpoints without tennis-related potential are filtered out
+ENDPOINTS = [
+    SofaScoreEndpoint("list", "sport", folder="categories"),
+    SofaScoreEndpoint("auto-complete", "query"),
+    SofaScoreEndpoint("search", "name", folder="teams"),
+    SofaScoreEndpoint("detail", "teamId", folder="teams"),
+    SofaScoreEndpoint("get-performance", "teamId", folder="teams"),
+    SofaScoreEndpoint("get-transfers", "teamId", folder="teams"),
+    SofaScoreEndpoint("get-squad", "teamId", folder="teams"),
+    SofaScoreEndpoint("get-rankings", "teamId", folder="teams"),
+    SofaScoreEndpoint("get-tournaments", "teamId", folder="teams"),
+    SofaScoreEndpoint("get-near-events", "teamId", folder="teams"),
+    SofaScoreEndpoint("get-statistics-seasons", "teamId", folder="teams"),
+    SofaScoreEndpoint("get-statistics", "teamId", "tournamentId", optparams=["type"],
+                      folder="teams"),
+    SofaScoreEndpoint("get-player-statistics-seasons", "teamId", folder="teams"),
+    SofaScoreEndpoint("get-player-statistics", optparams=["type"], folder="teams"),
+    SofaScoreEndpoint("get-last-matches", "teamId", optparams=["pageIndex"], folder="teams"),
+    SofaScoreEndpoint("get-next-matches", "teamId", optparams=["pageIndex"], folder="teams"),
+    SofaScoreEndpoint("search", "name", folder="players"),
+    SofaScoreEndpoint("detail", "playerId", folder="players"),
+    SofaScoreEndpoint("get-characteristics", "playerId", folder="players"),
+    SofaScoreEndpoint("get-last-ratings", "playerId", "tournamentId", "seasonId", folder="players"),
+    SofaScoreEndpoint("get-attribute-overviews", "playerId", folder="players"),
+    SofaScoreEndpoint("get-national-team-statistics", "playerId", folder="players"),
+    SofaScoreEndpoint("get-transfer-history", "playerId", folder="players"),
+    SofaScoreEndpoint("get-last-year-summary", "playerId", folder="players"),
+    SofaScoreEndpoint("get-statistics-seasons", "playerId", folder="players"),
+    SofaScoreEndpoint("get-statistics", "playerId", "tournamentId", optparams=["type"],
+                      folder="players"),
+    SofaScoreEndpoint("get-last-matches", "playerId", optparams=["pageIndex"], folder="players"),
+    SofaScoreEndpoint("get-next-matches", "playerId", optparams=["pageIndex"], folder="players"),
+    SofaScoreEndpoint("detail", "matchId", folder="matches"),
+    SofaScoreEndpoint("get-lineups", "matchId", folder="matches"),
+    SofaScoreEndpoint("get-last-ratings", "matchId", "tournamentId", "seasonId", folder="matches"),
+    SofaScoreEndpoint("get-incidents", "matchId", folder="matches"),
+    SofaScoreEndpoint("get-managers", "matchId", folder="matches"),
+    SofaScoreEndpoint("get-head2head", "matchId", folder="matches"),
+    SofaScoreEndpoint("get-votes", "matchId", folder="matches"),
+    SofaScoreEndpoint("get-graph", "matchId", folder="matches"),
+    SofaScoreEndpoint("get-statistics", "matchId", folder="matches"),
+    SofaScoreEndpoint("get-best-players", "matchId", folder="matches"),
+    SofaScoreEndpoint("get-media", "matchId", folder="matches"),
+    SofaScoreEndpoint("get-tweets", "matchId", folder="matches"),
+    SofaScoreEndpoint("get-player-statistics", "matchId", "playerId", folder="matches"),
+    SofaScoreEndpoint("get-player-heatmap", "matchId", "playerId", folder="matches"),
+]
+
+# teams
 MEN_TEAMID_MAP = {
     "Daniel Michalski": 257091,
     "Hubert Hurkacz": 158896,
@@ -69,17 +127,13 @@ def prune_canceled(matches_data: List[Json]) -> List[Json]:
 
 
 def pull_matches(player_teamid: int, page_index=0) -> Json:
-    url = "https://sofascore.p.rapidapi.com/teams/get-last-matches"
+    endpoint = get_endpoint(ENDPOINTS, "get-last-matches", "teams")
     playername = next((k for k, v in TEAMID_MAP.items() if v == player_teamid), None)
     if not playername:
         raise ValueError(f"Invalid player team ID: {player_teamid}.")
-    if page_index < 0:
-        raise ValueError(f"Negative page index: {page_index}.")
 
-    querystring = {"teamId": f"{player_teamid}", "pageIndex": str(page_index)}
-    response = requests.request("GET", url, headers=HEADERS, params=querystring)
-
-    return json.loads(response.text)
+    data = endpoint.retrieve(str(player_teamid), pageIndex=page_index)
+    return data["events"]
 
 
 def pull_all_matches(player_teamid: int) -> List[Json]:

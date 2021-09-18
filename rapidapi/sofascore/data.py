@@ -213,6 +213,8 @@ class Match:
     def __init__(self, data: Json) -> None:
         self._data = data
         self.status: Status = self._get_status()
+        if self.status in (Status.CANCELED, Status.COVERAGE_CANCELED, Status.WALKOVER):
+            raise InsufficientDataError(f"Match with status: {self.status}. Insufficient data.")
         self.ssid: str = data["customId"]
         self.tournament: Tournament = self._get_tournament()
         self.round: Optional[str] = data["roundInfo"]["name"] if data.get("roundInfo") else None

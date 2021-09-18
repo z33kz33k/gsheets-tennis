@@ -41,15 +41,15 @@
 #                  if c and c.ss_slug == "zuk-kacper"]
 #
 # pprint(zuk_instances)
-from pathlib import Path
-
-from utils import endpoint_retrieve
-from rapidapi.sofascore.api import HEADERS_MAP
-
-url = "https://sofascore.p.rapidapi.com/teams/get-statistics"
-paramsmap = {"teamId": "228272"}
-dest = Path()
-
+# from pathlib import Path
+#
+# from utils import endpoint_retrieve
+# from rapidapi.sofascore.api import HEADERS_MAP
+#
+# url = "https://sofascore.p.rapidapi.com/teams/get-statistics"
+# paramsmap = {"teamId": "228272"}
+# dest = Path()
+#
 # endpoint_retrieve()
 
 
