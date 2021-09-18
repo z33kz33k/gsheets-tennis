@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+from contexttimer import Timer
 import requests
 
 Json = Dict[str, Any]
@@ -36,7 +37,10 @@ def get_apikey(provider: str, api: str) -> Json:
 
 def endpoint_retrieve(endpoint_url: str, headersmap: Dict[str, str], paramsmap: Dict[str, str],
                       dumpdest: Optional[Path] = None) -> Union[Json, List[Json]]:
-    response = requests.request("GET", endpoint_url, headers=headersmap, params=paramsmap)
+    print(f"Retrieving data from '{endpoint_url}' with params '{paramsmap}'...")
+    with Timer() as t:
+        response = requests.request("GET", endpoint_url, headers=headersmap, params=paramsmap)
+    print(f"Request completed in {t.elapsed} seconds.")
     data = json.loads(response.text)
 
     if dumpdest is not None:
@@ -100,7 +104,11 @@ class UrlParamsEndpoint(Endpoint):
         url = f"{self.url}/{'/'.join(paramvalues)}"
         if not paramvalues:
             url = url[:-1]
-        response = requests.request("GET", url, headers=self.HEADERS_MAP)
+
+        print(f"Retrieving data from '{url}'...")
+        with Timer() as t:
+            response = requests.request("GET", url, headers=self.HEADERS_MAP)
+        print(f"Request completed in {t.elapsed} seconds.")
         data = json.loads(response.text)
 
         if dumpdest is not None:
@@ -142,7 +150,10 @@ class RequestParamsEndpoint(Endpoint):
         Similar to this module's 'endpoint_retrieve()'.
         """
         paramsmap = self.paramsmap(*paramvalues, **optparamvalues)
-        response = requests.request("GET", self.url, headers=self.HEADERS_MAP, params=paramsmap)
+        print(f"Retrieving data from '{self.url}' with parameters: {paramsmap}...")
+        with Timer() as t:
+            response = requests.request("GET", self.url, headers=self.HEADERS_MAP, params=paramsmap)
+        print(f"Request completed in {t.elapsed} seconds.")
         data = json.loads(response.text)
 
         if dumpdest is not None:
