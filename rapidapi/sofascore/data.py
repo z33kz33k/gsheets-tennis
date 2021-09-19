@@ -206,9 +206,7 @@ class Time:
 
 
 class Match:
-    """Tennis match statistics as pulled from sofascore.com.
-
-    NOTE: this class expects non-calceled match data on input.
+    """Tennis match statistics as pulled from sofascore.com by 'get-last-matches' endpoint.
     """
     def __init__(self, data: Json) -> None:
         self._data = data

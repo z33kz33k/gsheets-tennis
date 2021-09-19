@@ -50,15 +50,17 @@ def endpoint_retrieve(endpoint_url: str, headersmap: Dict[str, str], paramsmap: 
     return data
 
 
-class Endpoint(metaclass=ABCMeta):
+class ApiEndpoint(metaclass=ABCMeta):
     """API endpoint.
     """
     PREFIX = "http://"
     HEADERS_MAP: Dict[str, str] = {}
     HOST: str = ""  # eg. "tennis-live-data.p.rapidapi.com"
+    API_PROVIDER: str = ""  # eg. "rapidapi"
+    APINAME: str = ""  # eg. "sofascore"
 
     def __init__(self, endpoint: str, *params, folder: Optional[str] = None) -> None:
-        if type(self) is Endpoint:
+        if type(self) is ApiEndpoint:
             raise TypeError(f"Abstract class {self.__class__.__name__} must not be instantiated.")
         self.endpoint = endpoint
         self.params = params
@@ -72,28 +74,34 @@ class Endpoint(metaclass=ABCMeta):
 
     @abstractmethod
     def retrieve(self, *paramvalues: str,
-                 dumpdest: Optional[Path] = None) -> Union[Json, List[Json]]:
+                 dumpdest: Optional[Path] = None, **optparamvalues) -> Union[Json, List[Json]]:
         """Retrieve data from this endpoint.
 
         Similar to this module's 'endpoint_retrieve()'.
         """
 
+    def dump_sample(self, *paramvalues: str, **optparamvalues) -> Union[Json, List[Json]]:
+        """Retrieve sample data from this endpoint and dump it at default location.
+        """
+        dest = Path("data") / self.API_PROVIDER / self.APINAME / "samples"
+        return self.retrieve(*paramvalues, dumpdest=dest, **optparamvalues)
 
-class UrlParamsEndpoint(Endpoint):
+
+class UrlParamsEndpoint(ApiEndpoint):
     """API endpoint that sends parameters via 'url' arg of 'requests.request()' method.
     """
     def __init__(self, endpoint: str, *params: str, folder: Optional[str] = None) -> None:
         super().__init__(endpoint, *params, folder=folder)
 
     @property
-    def url(self) -> str:
+    def url(self) -> str:  # override
         """This endpoint's URL."""
         if self.folder:
             return f"{self.PREFIX}{self.HOST}/{self.folder}/{self.endpoint}"
         return f"{self.PREFIX}{self.HOST}/{self.endpoint}"
 
-    def retrieve(self, *paramvalues: str,
-                 dumpdest: Optional[Path] = None) -> Union[Json, List[Json]]:
+    def retrieve(self, *paramvalues: str,   # override
+                 dumpdest: Optional[Path] = None, **optparamvalues) -> Union[Json, List[Json]]:
         """Retrieve data from this endpoint.
 
         Similar to this module's 'endpoint_retrieve()'.
@@ -117,8 +125,11 @@ class UrlParamsEndpoint(Endpoint):
 
         return data
 
+    def dump_sample(self, *paramvalues: str) -> Union[Json, List[Json]]:  # override
+        ...
 
-class RequestParamsEndpoint(Endpoint):
+
+class RequestParamsEndpoint(ApiEndpoint):
     """API endpoint that sends parameters using 'params' arg of 'requests.request()' method.
     """
     def __init__(self, endpoint: str, *params: str,
@@ -127,7 +138,7 @@ class RequestParamsEndpoint(Endpoint):
         self.optparams = optparams if optparams else []
 
     @property
-    def url(self) -> str:
+    def url(self) -> str:  # override
         """This endpoint's URL."""
         if self.folder:
             return f"{self.PREFIX}{self.HOST}/{self.folder}/{self.endpoint}"
@@ -143,7 +154,7 @@ class RequestParamsEndpoint(Endpoint):
         paramsmap.update(optvalues)
         return paramsmap
 
-    def retrieve(self, *paramvalues: str,
+    def retrieve(self, *paramvalues: str,  # override
                  dumpdest: Optional[Path] = None, **optparamvalues) -> Union[Json, List[Json]]:
         """Retrieve data from this endpoint.
 
@@ -162,9 +173,12 @@ class RequestParamsEndpoint(Endpoint):
 
         return data
 
+    def dump_sample(self, *paramvalues: str) -> Union[Json, List[Json]]:  # override
+        ...
 
-def get_endpoint(endpoints: List[Endpoint], name: str,
-                 foldername: Optional[str] = None) -> Optional[Endpoint]:
+
+def get_endpoint(endpoints: List[ApiEndpoint], name: str,
+                 foldername: Optional[str] = None) -> Optional[ApiEndpoint]:
     if foldername:
         return next((e for e in endpoints if e.endpoint == name and e.folder == foldername), None)
     return next((e for e in endpoints if e.endpoint == name), None)

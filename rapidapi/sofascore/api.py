@@ -22,7 +22,9 @@ class SofaScoreEndpoint(RequestParamsEndpoint):
     """
     HOST = "sofascore.p.rapidapi.com"
     HOSTMAP = {'x-rapidapi-host': HOST}
-    KEYMAP = get_apikey("rapidapi", "sofascore")
+    API_PROVIDER = HOST.split(".")[2]
+    APINAME = HOST.split(".")[0]
+    KEYMAP = get_apikey(API_PROVIDER, APINAME)
     HEADERS_MAP = {**HOSTMAP, **KEYMAP}
 
     def __init__(self, endpoint: str, *params: str, optparams: Optional[List[str]] = None,
