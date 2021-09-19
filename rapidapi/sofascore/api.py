@@ -18,13 +18,13 @@ from utils import Json, get_apikey, RequestParamsEndpoint, get_endpoint
 
 
 class SofaScoreEndpoint(RequestParamsEndpoint):
-    """SofaScore-specific endpoint.
+    """SofaScore API endpoint.
     """
     HOST = "sofascore.p.rapidapi.com"
     HOSTMAP = {'x-rapidapi-host': HOST}
     API_PROVIDER = HOST.split(".")[2]
     APINAME = HOST.split(".")[0]
-    KEYMAP = get_apikey(API_PROVIDER, APINAME)
+    KEYMAP = get_apikey(API_PROVIDER)
     HEADERS_MAP = {**HOSTMAP, **KEYMAP}
 
     def __init__(self, endpoint: str, *params: str, optparams: Optional[List[str]] = None,
@@ -32,52 +32,44 @@ class SofaScoreEndpoint(RequestParamsEndpoint):
         super().__init__(endpoint, *params, optparams=optparams, folder=folder)
 
 
-# endpoints without tennis-related potential are filtered out
+# endpoints without tennis-related potential and those checked to be useless are filtered out
 ENDPOINTS = [
+    # teams
+    # returns 'categories' list (see Category class in data.py)
     SofaScoreEndpoint("list", "sport", folder="categories"),
+    # returns 'suggestions' list for query (eg. for 'iga świątek' it returns one: "Świątek, Iga")
     SofaScoreEndpoint("auto-complete", "query"),
+    # returns 'teams' list with data for teams that match given name
     SofaScoreEndpoint("search", "name", folder="teams"),
+    # returns 'team' dict with details for the given teamId
     SofaScoreEndpoint("detail", "teamId", folder="teams"),
+    # return 'events' list (last 10 matches data) and 'points' dict with float for each listed match
+    # this corresponds to FORM chart on: https://www.sofascore.com/team/tennis/swiatek-iga/228272
     SofaScoreEndpoint("get-performance", "teamId", folder="teams"),
-    SofaScoreEndpoint("get-transfers", "teamId", folder="teams"),
-    SofaScoreEndpoint("get-squad", "teamId", folder="teams"),
+    # see the sample for details, not very useful overall as it really gives only last ranking
+    # data and some sparse info on earlier performance (best ranking, best ranking date,
+    # previous ranking, number of tournaments played etc.)
     SofaScoreEndpoint("get-rankings", "teamId", folder="teams"),
-    SofaScoreEndpoint("get-tournaments", "teamId", folder="teams"),
+    # returns 'previousEvent' dict (info on the last match played)
     SofaScoreEndpoint("get-near-events", "teamId", folder="teams"),
-    SofaScoreEndpoint("get-statistics-seasons", "teamId", folder="teams"),
-    SofaScoreEndpoint("get-statistics", "teamId", "tournamentId", optparams=["type"],
-                      folder="teams"),
-    SofaScoreEndpoint("get-player-statistics-seasons", "teamId", folder="teams"),
-    SofaScoreEndpoint("get-player-statistics", optparams=["type"], folder="teams"),
+    # useful as it can return (when fed consecutive pageIndex values) whole history of a player's
+    # matches (see 'pull_all_matches()' below), sadly returned data for a match's competitors is
+    # flat (that means it's recent instead of being specific to the match's time)
     SofaScoreEndpoint("get-last-matches", "teamId", optparams=["pageIndex"], folder="teams"),
+    # probably dependent on time of request but when tested returned no data
     SofaScoreEndpoint("get-next-matches", "teamId", optparams=["pageIndex"], folder="teams"),
-    SofaScoreEndpoint("search", "name", folder="players"),
-    SofaScoreEndpoint("detail", "playerId", folder="players"),
-    SofaScoreEndpoint("get-characteristics", "playerId", folder="players"),
-    SofaScoreEndpoint("get-last-ratings", "playerId", "tournamentId", "seasonId", folder="players"),
-    SofaScoreEndpoint("get-attribute-overviews", "playerId", folder="players"),
-    SofaScoreEndpoint("get-national-team-statistics", "playerId", folder="players"),
-    SofaScoreEndpoint("get-transfer-history", "playerId", folder="players"),
-    SofaScoreEndpoint("get-last-year-summary", "playerId", folder="players"),
-    SofaScoreEndpoint("get-statistics-seasons", "playerId", folder="players"),
-    SofaScoreEndpoint("get-statistics", "playerId", "tournamentId", optparams=["type"],
-                      folder="players"),
-    SofaScoreEndpoint("get-last-matches", "playerId", optparams=["pageIndex"], folder="players"),
-    SofaScoreEndpoint("get-next-matches", "playerId", optparams=["pageIndex"], folder="players"),
+
+    # matches
+    # returns 'event' dict with match info (not very useful as this is mostly the same as what
+    # 'get-last-matches' gives but only of one item
     SofaScoreEndpoint("detail", "matchId", folder="matches"),
-    SofaScoreEndpoint("get-lineups", "matchId", folder="matches"),
-    SofaScoreEndpoint("get-last-ratings", "matchId", "tournamentId", "seasonId", folder="matches"),
-    SofaScoreEndpoint("get-incidents", "matchId", folder="matches"),
-    SofaScoreEndpoint("get-managers", "matchId", folder="matches"),
+    # returns 'tournaments' list of head2head matches, useful
     SofaScoreEndpoint("get-head2head", "matchId", folder="matches"),
+    # returns votes for and against something, whatever it is - not useful
     SofaScoreEndpoint("get-votes", "matchId", folder="matches"),
-    SofaScoreEndpoint("get-graph", "matchId", folder="matches"),
+    # returns data corresponding to MATCHES/STATISTICS chart
+    # on: https://www.sofascore.com/team/tennis/swiatek-iga/228272
     SofaScoreEndpoint("get-statistics", "matchId", folder="matches"),
-    SofaScoreEndpoint("get-best-players", "matchId", folder="matches"),
-    SofaScoreEndpoint("get-media", "matchId", folder="matches"),
-    SofaScoreEndpoint("get-tweets", "matchId", folder="matches"),
-    SofaScoreEndpoint("get-player-statistics", "matchId", "playerId", folder="matches"),
-    SofaScoreEndpoint("get-player-heatmap", "matchId", "playerId", folder="matches"),
 ]
 
 # teams

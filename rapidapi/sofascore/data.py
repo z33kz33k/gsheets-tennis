@@ -24,6 +24,9 @@ class Ground(Enum):
 
 
 class Category(Enum):
+    """Category as listed by request to 'categories/list' endpoint.
+    """
+    # seen in data
     WTA = "wta"
     ATP = "atp"
     CHALLENGER = "challenger"
@@ -31,6 +34,13 @@ class Category(Enum):
     ITF_MEN = "itf-men"
     ITF_WOMEN = "itf-women"
     DAVIS_CUP = "davis-cup"
+    # only seen in the endpoint response
+    CHALLENGER_WOMEN = "challenger-women"
+    BILLIE_JEAN_KING_CUP = "billie-jean-king-cup"
+    IN_PROGRESS = "in-progress"
+    GRAND_SLAM = "grand_slam"
+    # this one oddly doesn't get listed by categories endpoint, but nevertheless is present in
+    # the data
     JUNIORS = "juniors"
 
 
@@ -63,14 +73,15 @@ class Tournament:
     name: str
     altname: str
     category: Category
-    popularity: int  # 'userCont' in JSON, probably number of followers on SofaScore
-    ssid: int
+    followers_count: int  # 'userCount' in JSON
+    ss_type_id: int  # ID of this tournament instance's type
+    ssid: int  # this instance ID
 
 
 @dataclass(frozen=True)
 class Contender:
     name: str
-    popularity: int  # 'userCont' in JSON, probably number of followers on SofaScore
+    followers_count: int  # 'userCont' in JSON
     ss_slug: str
     ssid: int
     is_winner: bool
@@ -213,7 +224,7 @@ class Match:
         self.status: Status = self._get_status()
         if self.status in (Status.CANCELED, Status.COVERAGE_CANCELED, Status.WALKOVER):
             raise InsufficientDataError(f"Match with status: {self.status}. Insufficient data.")
-        self.ssid: str = data["customId"]
+        self.ssid: str = data["id"]
         self.tournament: Tournament = self._get_tournament()
         self.round: Optional[str] = data["roundInfo"]["name"] if data.get("roundInfo") else None
         self.first_to_serve: Optional[Side] = self._get_first_to_serve()
@@ -242,9 +253,10 @@ class Match:
                          if cat.value == self._data["tournament"]["category"]["slug"]), None)
         if not category:
             raise ValueError(f"Invalid input, can't parse for category: {self._data}")
-        popularity = self._data["tournament"]["uniqueTournament"]["userCount"]
-        id_ = self._data["tournament"]["category"]["id"]
-        return Tournament(name, altname, category, popularity, id_)
+        fcount = self._data["tournament"]["uniqueTournament"]["userCount"]
+        type_id = self._data["tournament"]["category"]["id"]
+        id_ = self._data["tournament"]["id"]
+        return Tournament(name, altname, category, fcount, type_id, id_)
 
     def _get_first_to_serve(self) -> Optional[Side]:
         data = self._data.get("firstToServe")
@@ -294,7 +306,7 @@ class Match:
                     gender = Gender.FEMALE
                 else:
                     raise ValueError(f"Invalid gender data: {data_}.")
-            popularity = data_["userCount"]
+            fcount = data_["userCount"]
             ss_slug = data_["slug"]
             ssid = data_["id"]
             if home:
@@ -303,7 +315,7 @@ class Match:
                 is_winner = True if self.winner is Side.AWAY else False
             side = Side.HOME if home else Side.AWAY
             ranking = data_.get("ranking")
-            return Contender(name, popularity, ss_slug, ssid, is_winner, side, gender, ranking)
+            return Contender(name, fcount, ss_slug, ssid, is_winner, side, gender, ranking)
 
         key = "homeTeam" if home else "awayTeam"
         data = self._data[key]

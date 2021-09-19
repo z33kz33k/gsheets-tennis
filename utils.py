@@ -24,15 +24,12 @@ class InsufficientDataError(ValueError):
     """
 
 
-def get_apikey(provider: str, api: str) -> Json:
+def get_apikey(provider: str) -> Json:
     data = json.loads(API_CREDS_FILE.read_text())
-    provider = data.get(provider)
-    if not provider:
+    keydata = data.get(provider)
+    if not keydata:
         raise ValueError(f"Invalid provider: {provider}.")
-    apikey = provider.get(api)
-    if not apikey:
-        raise ValueError(f"Invalid API: {api}.")
-    return apikey
+    return keydata
 
 
 def endpoint_retrieve(endpoint_url: str, headersmap: Dict[str, str], paramsmap: Dict[str, str],
@@ -53,17 +50,19 @@ def endpoint_retrieve(endpoint_url: str, headersmap: Dict[str, str], paramsmap: 
 class ApiEndpoint(metaclass=ABCMeta):
     """API endpoint.
     """
-    PREFIX = "http://"
+    PREFIX = "https://"
     HEADERS_MAP: Dict[str, str] = {}
     HOST: str = ""  # eg. "tennis-live-data.p.rapidapi.com"
     API_PROVIDER: str = ""  # eg. "rapidapi"
     APINAME: str = ""  # eg. "sofascore"
 
-    def __init__(self, endpoint: str, *params, folder: Optional[str] = None) -> None:
+    def __init__(self, endpoint: str, *params, optparams: Optional[List[str]] = None,
+                 folder: Optional[str] = None) -> None:
         if type(self) is ApiEndpoint:
             raise TypeError(f"Abstract class {self.__class__.__name__} must not be instantiated.")
         self.endpoint = endpoint
-        self.params = params
+        self.params = params if params else ()
+        self.optparams = optparams if optparams else ()
         self.folder = folder
 
     @property
@@ -80,18 +79,68 @@ class ApiEndpoint(metaclass=ABCMeta):
         Similar to this module's 'endpoint_retrieve()'.
         """
 
+    def _validate_paramvalues(self, *paramvalues) -> None:
+        if len(self.params) != len(paramvalues):
+            raise ValueError(f"Invalid number of values: {len(paramvalues)}.")
+
+    def paramsmap(self, *values) -> Dict[str, str]:
+        """Return params to values map.
+        """
+        self._validate_paramvalues(*values)
+        return {k: v for k, v in zip(self.params, values)}
+
+    def _validate_optparamvalues(self, **optparamvalues) -> None:
+        err_keys = [k for k in optparamvalues if k not in self.optparams]
+        if err_keys:
+            raise ValueError(f"Invalid optional values: {optparamvalues}.")
+
+    def optparamsmap(self, **optvalues) -> Dict[str, str]:
+        """Validate optvalues and return it.
+        """
+        self._validate_optparamvalues(**optvalues)
+        return optvalues
+
+    def _sample_dest(self, *paramvalues, **optparamvalues) -> Path:
+        destdir = Path("data") / self.API_PROVIDER / self.APINAME / "samples"
+        if not destdir.exists():
+            destdir.mkdir(parents=True)
+        filename = ""
+        if self.folder:
+            filename += self.folder + "_"
+        filename += self.endpoint.replace("-", "_")
+        if paramvalues:
+            filename += f"_{'_'.join(paramvalues)}"
+        if optparamvalues:
+            filename += f"_{'_'.join([*optparamvalues.values()])}"
+        filename += ".json"
+
+        return destdir / filename
+
     def dump_sample(self, *paramvalues: str, **optparamvalues) -> Union[Json, List[Json]]:
         """Retrieve sample data from this endpoint and dump it at default location.
         """
-        dest = Path("data") / self.API_PROVIDER / self.APINAME / "samples"
+        self._validate_paramvalues(*paramvalues)
+        self._validate_optparamvalues(**optparamvalues)
+        dest = self._sample_dest(*paramvalues, **optparamvalues)
         return self.retrieve(*paramvalues, dumpdest=dest, **optparamvalues)
+
+    def read_sample(self, *paramvalues: str, **optparamvalues) -> Union[Json, List[Json]]:
+        self._validate_paramvalues(*paramvalues)
+        self._validate_optparamvalues(**optparamvalues)
+        dest = self._sample_dest(*paramvalues, **optparamvalues)
+        return json.loads(dest.read_text())
+
+    def __repr__(self) -> str:  # override
+        return f"{self.__class__.__name__}(folder={self.folder}, endpoint={self.endpoint}, " \
+               f"params={self.params}, optparams={self.optparams})"
 
 
 class UrlParamsEndpoint(ApiEndpoint):
     """API endpoint that sends parameters via 'url' arg of 'requests.request()' method.
     """
-    def __init__(self, endpoint: str, *params: str, folder: Optional[str] = None) -> None:
-        super().__init__(endpoint, *params, folder=folder)
+    def __init__(self, endpoint: str, *params: str, optparams: Optional[List[str]] = None,
+                 folder: Optional[str] = None) -> None:
+        super().__init__(endpoint, *params, optparams=optparams, folder=folder)
 
     @property
     def url(self) -> str:  # override
@@ -106,12 +155,15 @@ class UrlParamsEndpoint(ApiEndpoint):
 
         Similar to this module's 'endpoint_retrieve()'.
         """
-        if len(paramvalues) != len(self.params):
-            raise ValueError(f"Invalid number of request's parameter values: "
-                             f"{len(paramvalues)}.")
-        url = f"{self.url}/{'/'.join(paramvalues)}"
-        if not paramvalues:
-            url = url[:-1]
+        # validation
+        self._validate_paramvalues(*paramvalues)
+        self._validate_optparamvalues(**optparamvalues)
+
+        url = f"{self.url}"
+        if paramvalues:
+            url += f"/{'/'.join(paramvalues)}"
+        if optparamvalues:
+            url += f"/{'/'.join([*optparamvalues.values()])}"
 
         print(f"Retrieving data from '{url}'...")
         with Timer() as t:
@@ -125,17 +177,13 @@ class UrlParamsEndpoint(ApiEndpoint):
 
         return data
 
-    def dump_sample(self, *paramvalues: str) -> Union[Json, List[Json]]:  # override
-        ...
-
 
 class RequestParamsEndpoint(ApiEndpoint):
     """API endpoint that sends parameters using 'params' arg of 'requests.request()' method.
     """
     def __init__(self, endpoint: str, *params: str,
                  optparams: Optional[List[str]] = None, folder: Optional[str] = None) -> None:
-        super().__init__(endpoint, *params, folder=folder)
-        self.optparams = optparams if optparams else []
+        super().__init__(endpoint, *params, optparams=optparams, folder=folder)
 
     @property
     def url(self) -> str:  # override
@@ -144,27 +192,18 @@ class RequestParamsEndpoint(ApiEndpoint):
             return f"{self.PREFIX}{self.HOST}/{self.folder}/{self.endpoint}"
         return f"{self.PREFIX}{self.HOST}/{self.endpoint}"
 
-    def paramsmap(self, *values, **optvalues) -> Dict[str, str]:
-        if len(self.params) != len(values):
-            raise ValueError(f"Invalid number of values: {len(values)}.")
-        err_keys = [k for k in optvalues if k not in self.optparams]
-        if err_keys:
-            raise ValueError(f"Invalid optional values: {optvalues}.")
-        paramsmap = {k: v for k, v in zip(self.params, values)}
-        paramsmap.update(optvalues)
-        return paramsmap
-
     def retrieve(self, *paramvalues: str,  # override
                  dumpdest: Optional[Path] = None, **optparamvalues) -> Union[Json, List[Json]]:
         """Retrieve data from this endpoint.
 
         Similar to this module's 'endpoint_retrieve()'.
         """
-        paramsmap = self.paramsmap(*paramvalues, **optparamvalues)
+        paramsmap, optparamsmap = self.paramsmap(*paramvalues), self.optparamsmap(**optparamvalues)
+        paramsmap.update(optparamsmap)
         print(f"Retrieving data from '{self.url}' with parameters: {paramsmap}...")
         with Timer() as t:
             response = requests.request("GET", self.url, headers=self.HEADERS_MAP, params=paramsmap)
-        print(f"Request completed in {t.elapsed} seconds.")
+        print(f"Request completed in {t.elapsed:.3f} seconds.")
         data = json.loads(response.text)
 
         if dumpdest is not None:
@@ -173,12 +212,9 @@ class RequestParamsEndpoint(ApiEndpoint):
 
         return data
 
-    def dump_sample(self, *paramvalues: str) -> Union[Json, List[Json]]:  # override
-        ...
-
 
 def get_endpoint(endpoints: List[ApiEndpoint], name: str,
-                 foldername: Optional[str] = None) -> Optional[ApiEndpoint]:
-    if foldername:
-        return next((e for e in endpoints if e.endpoint == name and e.folder == foldername), None)
+                 folder: Optional[str] = None) -> Optional[ApiEndpoint]:
+    if folder:
+        return next((e for e in endpoints if e.endpoint == name and e.folder == folder), None)
     return next((e for e in endpoints if e.endpoint == name), None)
