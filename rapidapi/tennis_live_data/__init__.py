@@ -2,7 +2,7 @@
 
     rapidapi.tennis_live_data
     ~~~~~~~~~~~~~~~~~~~~~~~~~
-    RapidAPI SofaScore API modules.
+    RapidAPI Tennis Live Data API modules.
 
     @author: z33k
 

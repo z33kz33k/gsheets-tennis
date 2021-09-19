@@ -9,11 +9,11 @@
 """
 from pprint import pprint
 
-from rapidapi.tennis_live_data.api import ENDPOINTS
+from rapidapi.sportscore.api import ENDPOINTS
 from utils import get_endpoint
 
-endpoint = get_endpoint(ENDPOINTS, "matches-results-by-player")
-endpoint.dump_sample("1088", "1369644")
+endpoint = get_endpoint(ENDPOINTS, "events", folder="sports")
+endpoint.dump_sample("2", "2021-09-06")
 
 # pprint(endpoint.retrieve("iga świątek ranking"))
 # result = endpoint.read_sample("228272")
