@@ -28,6 +28,9 @@ class SportScoreEndpoint(MainParamEndpoint):
         super().__init__(endpoint, mainparam, *params, optparams=optparams, folder=folder,
                          optparams_in_url=optparams_in_url)
 
+    # TODO: intervening /paramname/value/ in url for paramvalues (instead of UrlParamEndpoint's
+    # /value/value/)
+
 
 class SimpleSportScoreEndpoint(UrlParamsEndpoint):
     """Simple SportScore API endpoint.
