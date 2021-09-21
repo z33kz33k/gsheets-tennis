@@ -1,8 +1,8 @@
 """
 
-    rapidapi.sofascore.data.py
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    RapidAPI SofaScore enums and dataclasses.
+    rapidapi.tennis_abstract.data.py
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Tennis Abstract enums and dataclasses.
 
     @author: z33k
 
@@ -13,10 +13,12 @@ from dateutil import parser
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Generator, Optional
+from typing import Callable, Generator, Optional
 
 
 class Hand(Enum):
+    """Hand played.
+    """
     RIGHT = "R"
     LEFT = "L"
     UNKNOWN = "U"
@@ -24,6 +26,8 @@ class Hand(Enum):
 
 @dataclass
 class Player:
+    """Player as defined in Tennis Abstract data.
+    """
     id: int
     firstname: str
     lastname: str
@@ -35,9 +39,17 @@ class Player:
     def fullname(self):
         return f"{self.firstname} {self.lastname}"
 
+    @property
+    def csv_row(self) -> str:
+        return f"{self.id},{self.firstname},{self.lastname},{self.hand.value}," \
+               f"{self.birthdate.strftime('%Y%m%d')},{self.country_code}"
 
-def _getplayers(source: Path) -> Generator[Player, None, None]:
-    with source.open() as f:
+
+def getplayers(csvsource: Path,
+               filter_: Optional[Callable[[Player], bool]]) -> Generator[Player, None, None]:
+    """Return players from csvsource. Optionally, use a filtering function.
+    """
+    with csvsource.open() as f:
         reader = csv.reader(f)
         for row in reader:
             id_, fn, ln, hand, bd, cc = row
@@ -53,19 +65,40 @@ def _getplayers(source: Path) -> Generator[Player, None, None]:
                     bd = datetime.strptime(bd, "%Y%m")
                 else:
                     bd = None
-            yield Player(int(id_), fn, ln, hand, bd, cc)
+            player = Player(int(id_), fn, ln, hand, bd, cc)
+            if filter_ is not None and filter_(player):
+                yield player
+            elif filter_ is None:
+                yield player
 
 
-def atp_players() -> Generator[Player, None, None]:
+def atp_players(filter_: Optional[Callable[[Player], bool]]) -> Generator[Player, None, None]:
+    """Return ATP players from default Tennis Abstract data destination. Optionally,
+    use a filtering function.
+    """
     source = Path("data/tennis_abstract/atp/atp_players.csv")
-    return _getplayers(source)
+    return getplayers(source, filter_=filter_)
 
 
-def wta_players() -> Generator[Player, None, None]:
+def wta_players(filter_: Optional[Callable[[Player], bool]]) -> Generator[Player, None, None]:
+    """Return WTA players from default Tennis Abstract data destination. Optionally,
+    use a filtering function.
+    """
     source = Path("data/tennis_abstract/wta/wta_players.csv")
-    return _getplayers(source)
+    return getplayers(source, filter_=filter_)
 
 
+def atp_players_1978(filter_: Optional[Callable[[Player], bool]]) -> Generator[Player, None, None]:
+    """Return all ATP players born since 1978 from default Tennis Abstract data destination.
+    Optionally, use a filtering function.
+    """
+    source = Path("data/tennis_abstract/_reshaped/atp_players_1978.csv")
+    return getplayers(source, filter_=filter_)
 
 
-
+def wta_players_1978(filter_: Optional[Callable[[Player], bool]]) -> Generator[Player, None, None]:
+    """Return all WTA players born since 1978 from default Tennis Abstract data destination.
+    Optionally, use a filtering function.
+    """
+    source = Path("data/tennis_abstract/_reshaped/wta_players_1978.csv")
+    return getplayers(source, filter_=filter_)
