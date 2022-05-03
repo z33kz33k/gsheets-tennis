@@ -1,7 +1,7 @@
 """
 
-    rapidapi.tennis_abstract.data.py
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    tennis_abstract.data.py
+    ~~~~~~~~~~~~~~~~~~~~~~~
     Tennis Abstract enums and dataclasses.
 
     @author: z33k
@@ -48,6 +48,9 @@ class Player:
 def getplayers(csvsource: Path,
                filter_: Optional[Callable[[Player], bool]]) -> Generator[Player, None, None]:
     """Return players from csvsource. Optionally, use a filtering function.
+
+    Example:
+        >>> poles = [*(getplayers(source, filter_=lambda p: p.country_code == "POL"))]
     """
     with csvsource.open() as f:
         reader = csv.reader(f)

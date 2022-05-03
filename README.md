@@ -1,5 +1,5 @@
 # gsheets-tennis
-Tennis stats with sraping/webAPIs, Python and Google Sheets.
+Tennis stats with scraping/webAPIs, Python and Google Sheets.
 
 ### Usage
 
